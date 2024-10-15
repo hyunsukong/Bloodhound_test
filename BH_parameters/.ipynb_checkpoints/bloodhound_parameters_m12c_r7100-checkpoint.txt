@@ -29,8 +29,8 @@ snapnum_info_fname = f'{base_dir}/snapshot_times.txt'
 out_statement_dir = f'{base_dir}/bloodhound_subhalo_tracking/bloodhound_jobs'
 bloodhound_out_statement_fname_base = "bloodhound_result"
 infall_criteria_out_statement_fname_base = "infall_criteria_result"
-infall_subtree_out_dir = f'{base_dir}/bloodhound_subhalo_tracking/infalling_subtree_result'
-infall_subtree_out_fname_base = "infall_subtrees"
+infall_subtree_out_dir = f'{base_dir}/bloodhound_subhalo_tracking/infalling_subhalo_result'
+infall_subtree_out_fname_base = "infall_subhalo"
 tracked_halo_particle_dir = f'{base_dir}/bloodhound_subhalo_tracking/tracked_halo_particles'
 #
 # Whether infalling subhalos have already been identified or not. If not, do this step first.

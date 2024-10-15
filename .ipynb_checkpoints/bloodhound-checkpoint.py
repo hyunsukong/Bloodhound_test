@@ -99,6 +99,17 @@ def BH_initialization(parameter_fname, header_statement):
 '''
 * This function
 '''
+def read_in_infalling_subtree_data_FIRE(BH_parameters, sim_num, out_f):
+    #
+    # File name for the infall criteria subtree file.
+    fdir = BH_parameters['infall_subtree_out_dir']
+    fname_base = BH_parameters['infall_subtree_out_fname_base']
+    fname = f"{fdir}/{sim_num}_{sim_type}_{fname_base}.hdf5"
+    #
+    # Read in the data.
+    infall_subtree_df = pd.read_hdf(fname)
+    return(infall_subtree_df)
+#
 def read_in_infalling_subtree_data(BH_parameters, sim_num, out_f):
     #
     # File name for the infall criteria subtree file.
