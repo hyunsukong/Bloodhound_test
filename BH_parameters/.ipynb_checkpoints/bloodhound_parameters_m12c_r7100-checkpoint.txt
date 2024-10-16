@@ -34,17 +34,20 @@ infall_subtree_out_fname_base = "infall_subhalo"
 tracked_halo_particle_dir = f'{base_dir}/bloodhound_subhalo_tracking/tracked_halo_particles'
 #
 # Whether infalling subhalos have already been identified or not. If not, do this step first.
-subhalo_selection_done = 0 # 0: false, 1: true
+subhalo_selection_done = 1 # 0: false, 1: true
 #
 # Whether halo particle tracking for identified infalling subhalos have already been done or not.
 # If it's already been done, move on to the subhalo analysis step.
-halo_particle_tracking_done = 1 # 0: false, 1:true
+halo_particle_tracking_done = 0 # 0: false, 1:true
 #
 # Simulation numbers/names
 #sim_nums = [493, 539, 609, 694, 833, 848, 879, 988, 1107, 1245, 1386]
 #sim_nums = [493]
 sim_nums = [m12c_r7100]
 last_snapnum = 600
+#
+# Number of simulation output blocks per snapshot.
+num_output_files = 8
 #
 # Number of rockstar files per snapshot.
 num_rockstar_files = 16

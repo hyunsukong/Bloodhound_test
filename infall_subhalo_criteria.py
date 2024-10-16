@@ -34,7 +34,7 @@ import utilities
 ####################################################################################
 # Input parameters
 ####################################################################################
-parameter_fname = '/scratch/05097/hk9457/FIREII/m12c_r7100/bloodhound_subhalo_tracking/Bloodhound/BH_parameters/bloodhound_parameters_m12c_r7100.txt'
+parameter_fname = '/scratch/05097/hk9457/FIREII/m12c_r7100/bloodhound_subhalo_tracking/bloodhound_test/BH_parameters/bloodhound_parameters_m12c_r7100.txt'
 #
 ####################################################################################
 # Functions
@@ -400,12 +400,12 @@ def find_infalling_subhalos_FIRE(BH_parameters, main_branch_df, host_halo_dict, 
                 else:
                     non_phantom_snapnums = non_phantom_rows['snapshot'].values
                     nearest_idx = np.argmin(np.abs(non_phantom_snapnums - infall_snap))
-                    new_infall_row = non_phantom_rows.iloc[nearest_idx]
-                    idx_difference = int(infall_snap) - int(new_infall_row['snapshot'])
+                    infall_row = non_phantom_rows.iloc[nearest_idx]
+                    idx_difference = int(infall_snap) - int(infall_row['snapshot'])
                     infall_idx = int(infall_idx - idx_difference)
-                    infall_a = new_infall_row['scale']
-                    infall_snap = int(new_infall_row['snapshot'])
-                    catalog_ID_at_infall = int(new_infall_row['catalog.index'])
+                    infall_a = infall_row['scale']
+                    infall_snap = int(infall_row['snapshot'])
+                    catalog_ID_at_infall = int(infall_row['catalog.index'])
             #
             # Check if min_vinfall<=Vinfall<max_vinfall.
             #if infall_row.vmax>=min_vinfall:

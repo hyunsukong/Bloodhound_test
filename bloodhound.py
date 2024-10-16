@@ -32,7 +32,7 @@ import utilities
 #-----------------------------------------------------------------------------------
 # Input parameters
 #-----------------------------------------------------------------------------------
-parameter_fname = '/scratch/05097/hk9457/FIREII/m12c_r7100/bloodhound_subhalo_tracking/Bloodhound/BH_parameters/bloodhound_parameters_m12c_r7100.txt'
+parameter_fname = '/scratch/05097/hk9457/FIREII/m12c_r7100/bloodhound_subhalo_tracking/bloodhound_test/BH_parameters/bloodhound_parameters_m12c_r7100.txt'
 #
 #-----------------------------------------------------------------------------------
 # Fuctions
@@ -291,7 +291,7 @@ def get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out
     infall_snapshot_arr = infall_information_dict["snapshot.infall"]
     infall_hid_list = infall_information_dict["ID.halo.infall"]
     #
-    for i in range(len(infall_snapshot_arr)):
+    for i in range(len(infall_snapshot_arr[:5])):
         current_snap = infall_snapshot_arr[i]
         current_snap_infall_hid_arr = infall_hid_list[i]
         #
@@ -312,7 +312,6 @@ def get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out
         #
         # Get particle IDs of halos infalling at the current snapshot.
         current_snap_pID_list = []
-        print(len(current_snap_infall_hid_arr), len(particle_ID_list))
         for j in range(len(current_snap_infall_hid_arr)):
             current_hID = current_snap_infall_hid_arr[j]
             current_halo_pID_tuple = get_particle_IDs_of_halo(current_hID, hID_numP_pairs_df_list, particle_ID_list, out_f)
@@ -373,6 +372,35 @@ def initialize_halo_tracking(BH_parameters, sim_num, out_f):
     #
     # Return the infalling subhalo data dictionary.
     return(infall_information_dict)
+#
+def initialize_snapshot_data_FIRE(BH_parameters, sim_num, snap_num, base_dir, use_argsort, out_f):
+    '''
+    * This function uses the SnapshotData class from utilities.py to read in the snapshot data.
+    '''
+    # Number of output blocks per snapshot.
+    blocks = BH_parameters['num_output_files']
+    snapshot_data_dict = {}
+    # Initialize the snapshot dictionary-class.
+    snapshot_data_dict['snapshot_data'] = utilities.SnapshotData_FIRE(sim_num, snap_num, base_dir, blocks)
+    #
+    for i in range(len(snapshot_data_dict)):
+        #
+        # Read in the simulation snapshot output data.
+        print(f"* Reading in the simulation output data: snapshot {snap_num} ... ", end="", flush=True, file=out_f)
+        t_s_step = time.time()
+        snapshot_data_dict['snapshot_data'].read_in_snapshot_data(use_argsort)
+        t_e_step = time.time()
+        utilities.print_time_taken(t_s_step, t_e_step, "*" ,True, out_f)
+        #
+        # Read in the particle ID sort index data, if it exists.
+        if use_argsort:
+            print(f"* Reading in the particle ID sort index data: snapshot {snap_num} ... ", end="", flush=True, file=out_f)
+            t_s_step = time.time()
+            snapshot_data_dict['snapshot_data'].read_in_pID_argsort_data()
+            t_e_step = time.time()
+            utilities.print_time_taken(t_s_step, t_e_step, "*" ,True, out_f)
+    #
+    return(snapshot_data_dict)
 #
 def initialize_snapshot_data(sim_num, snap_num, base_dir, sim_types, use_argsort, out_f):
     '''
@@ -503,7 +531,10 @@ def subhalo_tracking_wrapper_function(BH_parameters, sim_num, infall_information
         print(f"# Current snapshot: {current_snap} #", flush=True, file=out_f)
         #
         # Initialize the snapshot dictionary which contains a snapshot dictionary-class for each element in BH_parameters['tracking_order'].
-        snapshot_data_dict = initialize_snapshot_data(sim_num, current_snap, BH_parameters['base_dir'], BH_parameters['tracking_order'], use_argsort, out_f)
+        if BH_parameters['simulation_name'] == 'pELVIS':
+            snapshot_data_dict = initialize_snapshot_data(sim_num, current_snap, BH_parameters['base_dir'], BH_parameters['tracking_order'], use_argsort, out_f)
+        elif BH_parameters['simulation_name'] == 'FIRE':
+            snapshot_data_dict = initialize_snapshot_data_FIRE(BH_parameters, sim_num, current_snap, BH_parameters['base_dir'], use_argsort, out_f)
         #
         # For the first snapshot used, print some useful information.
         if i == 0:
@@ -551,7 +582,8 @@ def subhalo_tracking_wrapper_function(BH_parameters, sim_num, infall_information
                     tracked_particle_data = track_particles(snapshot_data_dict[key], current_halo_pIDs, use_argsort)
                     #
                     # Save tracked particle data in a .hdf5 file.
-                    utilities.output_halo_particles_hdf5(BH_parameters["tracked_halo_particle_dir"], sim_num, current_hID, infall_snap, [current_snap], current_halo_pIDs, [tracked_particle_data], key, out_f)
+                    
+                    utilities.output_halo_particles_hdf5(BH_parameters, sim_num, current_hID, infall_snap, [current_snap], current_halo_pIDs, [tracked_particle_data], key, out_f)
             #
             t_e_step = time.time()
             utilities.print_time_taken(t_s_step, t_e_step, "  *", True, out_f)
@@ -587,7 +619,7 @@ def subhalo_tracking_wrapper_function(BH_parameters, sim_num, infall_information
                     tracked_particle_data = track_particles(snapshot_data_dict[key], current_halo_pIDs, use_argsort)
                     #
                     # Save tracked particle data in a .hdf5 file.
-                    utilities.output_halo_particles_hdf5(BH_parameters["tracked_halo_particle_dir"], sim_num, current_hID, earlier_infall_snap, [current_snap], current_halo_pIDs, [tracked_particle_data], key, out_f)
+                    utilities.output_halo_particles_hdf5(BH_parameters, sim_num, current_hID, earlier_infall_snap, [current_snap], current_halo_pIDs, [tracked_particle_data], key, out_f)
         #
         t_e_step = time.time()
         utilities.print_time_taken(t_s_step, t_e_step, "  *", True, out_f)

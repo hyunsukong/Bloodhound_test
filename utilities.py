@@ -27,6 +27,95 @@ GIZMO:
   *** For Phat ELVIS:
       - PartType1 = dark matter high-res?
 '''
+class SnapshotData_FIRE(dict):
+    '''
+    * A dictionary-class for handling snapshot data
+    - For now, only compatible with the Phat ELVIS simulations
+    - The original Phat ELVIS simulations have rather inconsistent snapshot file names,
+      so this class handles them in very specific ways.
+    - For one snapshot
+    '''
+    def __init__(self, sim_num, snap_num, base_dir, blocks):
+        self['simulation.number'] = sim_num
+        self['snapshot.number'] = snap_num
+        self['base.directory'] = base_dir
+        self['number.of.blocks'] = blocks
+        #
+        # Make snapshot file names.
+        self['file.path'] = []
+        if blocks == 1:
+            snap_fname = f"{base_dir}/output/snapshot_{snap_num:03d}.hdf5"
+            self['file.path'].append(snap_fname)
+        elif blocks > 1:
+            for i in range(blocks):
+                block_fname = f"{base_dir}/output/snapdir_{snap_num:03d}/snapshot_{snap_num:03d}.{i}.hdf5"
+                self['file.path'].append(block_fname)
+                
+    #
+    def read_in_pID_argsort_data(self):
+        self['file.path.sort_idx'] = f"{self['base.directory']}/{self['run.type']}/halo_{self['simulation.number']}/sorted_pID/part_ID_argsort_idx_{self['snapshot.number']:03d}.npz"
+        #
+        # Open the particle ID sort index file.
+        with np.load(self['file.path.sort_idx'], mmap_mode='r', allow_pickle=False) as sort_idx_file:
+            self['pID.sort_idx'] = sort_idx_file['particle_ID']
+    #
+    def read_in_snapshot_data(self, use_argsort):
+        '''
+        * This method opens and reads in the snapshot data for one snapshot.
+        - If the snapshot data is stored in multiple files, it will concatenate the data.
+        '''
+        for i in range(self['number.of.blocks']):
+            snap_fname = self['file.path'][i]
+            #
+            # Open the snapshot block.
+            with h5py.File(snap_fname, 'r') as snap_dat:
+                #
+                # Read in Particle IDs, Coordinates, and Velocities.
+                if use_argsort:
+                    # If particle ID argsort data exists, don't need to read in the particle ID data from the simulation output.
+                    coordinates = snap_dat['PartType1/Coordinates'][:]
+                    velocities = snap_dat['PartType1/Velocities'][:]
+                    #particle_IDs = snap_dat['PartType1/ParticleIDs'][:]
+                    #
+                    # Append the data to the final array.
+                    if i == 0:
+                        #pID_arr = particle_IDs
+                        coord_arr = coordinates
+                        vel_arr = velocities
+                    else:
+                        #pID_arr = np.concatenate((pID_arr, particle_IDs))
+                        coord_arr = np.concatenate((coord_arr, coordinates), axis=0)
+                        vel_arr = np.concatenate((vel_arr, velocities), axis=0)
+                    
+                else:
+                    particle_IDs = snap_dat['PartType1/ParticleIDs'][:]
+                    coordinates = snap_dat['PartType1/Coordinates'][:]
+                    velocities = snap_dat['PartType1/Velocities'][:]
+                    #
+                    # Append the data to the final array.
+                    if i == 0:
+                        pID_arr = particle_IDs
+                        coord_arr = coordinates
+                        vel_arr = velocities
+                    else:
+                        pID_arr = np.concatenate((pID_arr, particle_IDs))
+                        coord_arr = np.concatenate((coord_arr, coordinates), axis=0)
+                        vel_arr = np.concatenate((vel_arr, velocities), axis=0)
+        #
+        # Store the merged data.
+        self["Coordinates"] = coord_arr
+        self["Velocities"] = vel_arr
+        #self["ID.particle"] = pID_arr
+        if not use_argsort:
+            self["ID.particle"] = pID_arr
+    #
+    def print_header(self, out_f):
+        fname = self['file.path'][0]
+        with h5py.File(fname, 'r') as snap_dat:
+            print(f"  * Groups: {list(snap_dat.keys())}", flush=True, file=out_f)
+            print(f"  * Members of 'PartType1': {list(snap_dat['PartType1'].keys())}", flush=True, file=out_f)
+            print(f"  * Members of 'PartType2': {list(snap_dat['PartType2'].keys())}", flush=True, file=out_f)
+            print(f"  * Metadata dictionary: {dict(snap_dat['Header'].attrs.items())}", flush=True, file=out_f)
 #
 class SnapshotData(dict):
     '''
@@ -209,8 +298,9 @@ def get_halo_particle_file_names_in_dir(dpath):
     #
     return(hID_arr, infall_snap_arr, full_name_arr)
 #
-def output_halo_particles_hdf5(dir_name, sim_num, halo_ID, infall_snap, snaps_to_save,
+def output_halo_particles_hdf5(BH_parameters, sim_num, halo_ID, infall_snap, snaps_to_save,
                                infall_halo_pIDs, tracked_particle_data, run_type, out_f):
+    dir_name = BH_parameters["tracked_halo_particle_dir"]
     '''
     * This function saves tracked halo particle data for a single halo in a .hdf5 file.
     - dir_name: base directory path for the output .hdf5 file
@@ -224,7 +314,10 @@ def output_halo_particles_hdf5(dir_name, sim_num, halo_ID, infall_snap, snaps_to
     - run_type: simulation type - For Phat ELVIS, 'dmo' or 'disk'
     '''
     # Make the output file name.
-    fname = f"{dir_name}/{run_type}/{sim_num}/hID_{halo_ID}_infall_snap_{infall_snap}_particles.hdf5"
+    if BH_parameters['simulation_name'] == 'pELVIS':
+        fname = f"{dir_name}/{run_type}/{sim_num}/hID_{halo_ID}_infall_snap_{infall_snap}_particles.hdf5"
+    elif BH_parameters['simulation_name'] == 'FIRE':
+        fname = f"{dir_name}/hID_{halo_ID}_{infall_snap}_particles.hdf5"
     #
     # Make dataset names.
     dset_name_pID = "ParticleIDs"
@@ -492,7 +585,7 @@ def open_snap_header_file(fname, sim_name):
     full_z_list = []
     full_a_list = []
     full_t_list = []
-    full_t_width_list = []
+    #full_t_width_list = []
     # Open the file and read-in the data.
     with open(fname) as f:
         for line in f:
@@ -513,14 +606,14 @@ def open_snap_header_file(fname, sim_name):
                 full_a_list.append(float(line_list[1]))
                 full_z_list.append(float(line_list[2]))
                 full_t_list.append(float(line_list[3]))
-                full_t_width_list.append(float(line_list[4]))
+                #full_t_width_list.append(float(line_list[4]))
     #
     # Convert the lists to arrays.
     full_snap_arr = np.array(full_snap_list)
     full_z_arr = np.array(full_z_list)
     full_a_arr = np.array(full_a_list)
     full_t_arr = np.array(full_t_list)
-    full_t_width_arr = np.array(full_t_width_list)
+    #full_t_width_arr = np.array(full_t_width_list)
     #
     # Make a result dictionary.
     if sim_name == 'pELVIS':
@@ -535,7 +628,6 @@ def open_snap_header_file(fname, sim_name):
             "redshifts": full_z_arr,
             "scale_factors": full_a_arr,
             "time": full_t_arr,
-            "time_width": full_t_width_arr
         }
 
     return(header_dict)
@@ -621,6 +713,54 @@ def various_halo_file_names(base_dir, sim_num):
 '''
 * Read-in the main branch data for the host halo.
 '''
+def read_in_host_main_branch_file_FIRE(sim_file_name_dict, sim_num, BH_parameters):
+    # All distance units will be converted to non-h units.
+    h = BH_parameters['h']
+    #
+    # Make the dictionary key name for the subtree main branch file.
+    fname_key = f"host_main_branch"
+    #
+    # Get the file name.
+    fname = sim_file_name_dict[fname_key]
+    #
+    # Read in the host main branch file for the current simulation.
+    host_main_branch_file = pd.read_csv(fname)
+    #
+    # Get various properties of the host tree as arrays.
+    # Flip the arrays so they are ordered from early time to late time.
+    host_x = np.flip(host_main_branch_file.x.values)
+    host_y = np.flip(host_main_branch_file.y.values)
+    host_z = np.flip(host_main_branch_file.z.values)
+    host_snapnums = np.flip(host_main_branch_file.snapshot.values)
+    host_vmax = np.flip(host_main_branch_file['vel.circ.max'].values)
+    host_rvir = np.flip(host_main_branch_file.radius.values)
+    #host_rvir_pkpc = np.multiply(host_rvir, host_scale)
+    #host_tid = np.flip(host_main_branch_file.id.values)
+    # Get the time information for the simulation.
+    sim_snapshot_numbers = BH_parameters['time_info_dict']['snapshot_numbers']
+    sim_scale_factors = BH_parameters['time_info_dict']['scale_factors']
+    sim_redshifts = BH_parameters['time_info_dict']['redshifts']
+    sim_t_cosmic = BH_parameters['time_info_dict']['time']
+    sim_t_lookback = sim_t_cosmic[-1] - sim_t_cosmic
+    # Match the snapshots to get the time information for the host halo tree.
+    first_idx = np.nonzero(np.isclose(sim_snapshot_numbers, host_snapnums[0]))[0][0]
+    host_scale = sim_scale_factors[first_idx:]
+    host_redshift = sim_redshifts[first_idx:]
+    host_t_cosmic = sim_t_cosmic[first_idx:]
+    host_t_lookback = sim_t_lookback[first_idx:]
+    #
+    # Create a dictionary for the host halo data.
+    host_dict = {}
+    host_dict['x'] = host_x
+    host_dict['y'] = host_y
+    host_dict['z'] = host_z
+    host_dict['scale'] = host_scale
+    host_dict['vmax'] = host_vmax
+    host_dict['rvir'] = host_rvir
+    #host_dict['rvir_phys'] = host_rvir_pkpc
+    #host_dict['tree_id'] = host_tid
+    return(host_dict)
+#
 def read_in_host_main_branch_file(sim_file_name_dict, sim_num, sim_type, BH_parameters):
     cosmo = BH_parameters['cosmo']
     # All distance units will be converted to non-h units.
