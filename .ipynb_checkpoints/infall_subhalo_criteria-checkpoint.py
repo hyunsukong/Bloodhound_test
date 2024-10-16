@@ -194,7 +194,7 @@ def find_broken_link_tree_subhalos(infalling_subhalo_dict):
     # Initialize the result dictionary for broken-link tree subhalo data.
     # scale.infall and idx.infall correspond to the first scale factor the broken link tree appears at, obviously not the infall scale factor.
     broken_link_subhalo_dict = {
-        "ID.subtree":[],
+        "tree.tid":[],
         "scale.infall":[],
         "idx.infall":[],
         "subtree":[],
@@ -204,7 +204,7 @@ def find_broken_link_tree_subhalos(infalling_subhalo_dict):
     # Identify indices for broken-link tree subhalos.
     # scale.infall and idx.infall correspond to the first scale factor the broken link tree appears at, obviously not the infall scale factor.
     broken_link_subs_idx = np.where(infalling_subhalo_dict["infalling?"] == 0)[0]
-    broken_link_subhalo_dict["ID.subtree"] = infalling_subhalo_dict["ID.subtree"][broken_link_subs_idx]
+    broken_link_subhalo_dict["tree.tid"] = infalling_subhalo_dict["tree.tid"][broken_link_subs_idx]
     broken_link_subhalo_dict["scale.infall"] = infalling_subhalo_dict["scale.infall"][broken_link_subs_idx]
     broken_link_subhalo_dict["idx.infall"] = infalling_subhalo_dict["idx.infall"][broken_link_subs_idx] # this might just contain a bunch of 0s?
     broken_link_subhalo_dict["subtree"] = infalling_subhalo_dict['subtree'][broken_link_subs_idx]
@@ -212,7 +212,7 @@ def find_broken_link_tree_subhalos(infalling_subhalo_dict):
     #
     # Identify indices for infalling subhalos.
     infalling_subs_idx = np.where(infalling_subhalo_dict["infalling?"] == 1)[0]
-    infalling_subhalo_dict["ID.subtree"] = infalling_subhalo_dict["ID.subtree"][infalling_subs_idx]
+    infalling_subhalo_dict["tree.tid"] = infalling_subhalo_dict["tree.tid"][infalling_subs_idx]
     infalling_subhalo_dict["scale.infall"] = infalling_subhalo_dict["scale.infall"][infalling_subs_idx]
     infalling_subhalo_dict["idx.infall"] = infalling_subhalo_dict["idx.infall"][infalling_subs_idx]
     infalling_subhalo_dict["subtree"] = infalling_subhalo_dict["subtree"][infalling_subs_idx]
@@ -301,12 +301,13 @@ def find_first_infall_from_subtree(subtree, host_scale_arr, host_rvir_arr):
 '''
 def find_infalling_subhalos_FIRE(BH_parameters, main_branch_df, host_halo_dict, out_f):
     # Initialize the result dictionary.
-    infalling_subhalo_dict = {"ID.subtree":[],
+    infalling_subhalo_dict = {"tree.tid":[],
                               "scale.infall":[],
                               "snapshot.infall":[],
                               "idx.infall":[],
                               "subtree":[],
-                              "infalling?":[]}
+                              "infalling?":[],
+                              "ID.halo.infall":[]}
     #
     # Read in relevant parameters: infall z, min/max V_infall.
     low_z = BH_parameters['first_infall_z_low']
@@ -328,33 +329,35 @@ def find_infalling_subhalos_FIRE(BH_parameters, main_branch_df, host_halo_dict, 
     max_vinfall = BH_parameters['max_vinfall']
     #
     # Host halo information: arrays are sorted from early to late times, same as the subtree data.
-    # For FIRE, all distances are in physical units, if using Andrew Wetzel's package.
     host_scale_arr = host_halo_dict['scale']
-    host_rvir_arr = host_halo_dict['rvir']
-    host_x_arr = host_halo_dict['x']
-    host_y_arr = host_halo_dict['y']
-    host_z_arr = host_halo_dict['z']
-    host_coords_arr = np.column_stack((host_x_arr, host_y_arr, host_z_arr))
+    host_rvir_arr = host_halo_dict['rvir'] # Physical kpc
+    host_x_arr = host_halo_dict['x'] * host_scale_arr # Physical kpc
+    host_y_arr = host_halo_dict['y'] * host_scale_arr
+    host_z_arr = host_halo_dict['z'] * host_scale_arr
+    host_coords_arr = np.column_stack((host_x_arr, host_y_arr, host_z_arr)) # Physical kpc
     #
     # Group the subtree main branch dataframe by the subtree ID.
     main_branch_grouped = main_branch_df.groupby('tree.tid')
-    print(f"* Total length of the subtree main branch dataframe: {len(main_branch_df)} rows", flush=True, file=out_f)
-    print(f"* Total number of subtrees: {len(main_branch_grouped)}", flush=True, file=out_f)
+    print(f"* Total length of the tree main branch dataframe: {len(main_branch_df)} rows", flush=True, file=out_f)
+    print(f"* Total number of trees: {len(main_branch_grouped)}", flush=True, file=out_f)
     #
     # Find all subtrees that had min_vinfall<=Vmax<max_vinfall for at least one snapshot between low_z<=z<=high_z.
     #vmax_query = subtree_main_branch_df.query('@min_vinfall <= `vel.circ.max` < @max_vinfall & @high_z_scale <= scale <= @low_z_scale')
     # Using snapshot numbers instead.
-    vmax_query = main_branch_df.query('@min_vinfall <= `vel.circ.max` < @max_vinfall & @high_z_snap <= snapshot <= @low_z_snap')
-    vmax_query_uniq_sids = np.unique(vmax_query['tree.tid'].values)
-    out_string = (
-        f"* Number of subtrees that had {min_vinfall}<=Vmax<{max_vinfall}km/s"
-        f" at least once between {low_z}<=z<={high_z}: {len(vmax_query_uniq_sids)}"
-    )
-    print(out_string, flush=True, file=out_f)
+    #vmax_query = main_branch_df.query('@min_vinfall <= `vel.circ.max` < @max_vinfall & @high_z_snap <= snapshot <= @low_z_snap')
+    #vmax_query_uniq_sids = np.unique(vmax_query['tree.tid'].values)
+    #out_string = (
+    #    f"* Number of subtrees that had {min_vinfall}<=Vmax<{max_vinfall}km/s"
+    #    f" at least once between {low_z}<=z<={high_z}: {len(vmax_query_uniq_sids)}"
+    #)
+    #print(out_string, flush=True, file=out_f)
     #
     # Loop through each subtree in vmax_query and identify subhalos that meet the infall criteria.
-    for i in range(len(vmax_query_uniq_sids)):
-        current_sid = vmax_query_uniq_sids[i]
+    uniq_sids = np.unique(main_branch_df['tree.tid'].values)
+    #for i in range(len(vmax_query_uniq_sids)):
+    for i in range(len(uniq_sids)):
+        #current_sid = vmax_query_uniq_sids[i]
+        current_sid = uniq_sids[i]
         current_subtree = main_branch_grouped.get_group(current_sid)[::-1] # Order the subtree from early to late times.
         #
         # Add the scale factor array to the dataframe.
@@ -365,10 +368,10 @@ def find_infalling_subhalos_FIRE(BH_parameters, main_branch_df, host_halo_dict, 
         scale_arr = sim_scale_factors[first_snap_idx:last_snap_idx+1]
         current_subtree.insert(1, 'scale', scale_arr)
         # Add the distance (wrt host center) array to the dataframe.
-        x_arr = current_subtree['x'].values
-        y_arr = current_subtree['y'].values
-        z_arr = current_subtree['z'].values
-        coords_arr = np.column_stack((x_arr, y_arr, z_arr))
+        x_arr = current_subtree['x'].values * scale_arr # Physical kpc
+        y_arr = current_subtree['y'].values * scale_arr
+        z_arr = current_subtree['z'].values * scale_arr
+        coords_arr = np.column_stack((x_arr, y_arr, z_arr)) # Physical kpc
         # host's coordinates at the snapshots of the subhalo elements.
         #low_z_idx = np.argmin(np.abs(sim_scale_factors - low_z_scale))
         #high_z_idx = np.argmin(np.abs(sim_scale_factors - high_z_scale))
@@ -387,38 +390,57 @@ def find_infalling_subhalos_FIRE(BH_parameters, main_branch_df, host_halo_dict, 
         if high_z_scale <= infall_a <= low_z_scale:
             # Take the tree element at the infall scale factor.
             infall_row = current_subtree.iloc[infall_idx]
+            catalog_ID_at_infall = int(infall_row['catalog.index'])
+            if catalog_ID_at_infall < 0:
+                # Halo at the infall snapshot is a phantom halo, so replace the infall snapshot with an nearby snapshot that has the highest value of 'vel.circ.max'.
+                # Halo at the infall snapshot is a phantom halo, so replace the infall snapshot with the nearest non-phantom row.
+                non_phantom_rows = current_subtree.query('`catalog.index`>0')
+                if len(non_phantom_rows) == 0:
+                    print(f"*** {current_sid}: all tree entries are phantom! You should never see this message!", flush=True, file=out_f)
+                else:
+                    non_phantom_snapnums = non_phantom_rows['snapshot'].values
+                    nearest_idx = np.argmin(np.abs(non_phantom_snapnums - infall_snap))
+                    new_infall_row = non_phantom_rows.iloc[nearest_idx]
+                    idx_difference = int(infall_snap) - int(new_infall_row['snapshot'])
+                    infall_idx = int(infall_idx - idx_difference)
+                    infall_a = new_infall_row['scale']
+                    infall_snap = int(new_infall_row['snapshot'])
+                    catalog_ID_at_infall = int(new_infall_row['catalog.index'])
             #
             # Check if min_vinfall<=Vinfall<max_vinfall.
             #if infall_row.vmax>=min_vinfall:
             if infall_row['vel.circ.max']>=min_vinfall and infall_row['vel.circ.max']<=max_vinfall:
-                infalling_subhalo_dict["ID.subtree"].append(current_sid)
+                infalling_subhalo_dict["tree.tid"].append(current_sid)
                 infalling_subhalo_dict["scale.infall"].append(infall_a)
                 infalling_subhalo_dict["snapshot.infall"].append(infall_snap)
                 infalling_subhalo_dict["idx.infall"].append(infall_idx)
                 infalling_subhalo_dict["subtree"].append(current_subtree)
                 infalling_subhalo_dict["infalling?"].append(infalling)
+                infalling_subhalo_dict["ID.halo.infall"].append(catalog_ID_at_infall)
     #
     # Convert lists to arrays.
-    infalling_subhalo_dict["ID.subtree"] = np.array(infalling_subhalo_dict["ID.subtree"])
+    infalling_subhalo_dict["tree.tid"] = np.array(infalling_subhalo_dict["tree.tid"])
     infalling_subhalo_dict["scale.infall"] = np.array(infalling_subhalo_dict["scale.infall"])
     infalling_subhalo_dict["snapshot.infall"] = np.array(infalling_subhalo_dict["snapshot.infall"])
     infalling_subhalo_dict["idx.infall"] = np.array(infalling_subhalo_dict["idx.infall"])
     infalling_subhalo_dict["subtree"] = np.array(infalling_subhalo_dict["subtree"], dtype=object)
     infalling_subhalo_dict["infalling?"] = np.array(infalling_subhalo_dict["infalling?"])
+    infalling_subhalo_dict["ID.halo.infall"] = np.array(infalling_subhalo_dict["ID.halo.infall"])
     #
     # Sort the infalling subhalo dictionary data by the infall scale factor.
     infall_scale_argsort_idx = np.argsort(infalling_subhalo_dict["scale.infall"])
-    infalling_subhalo_dict["ID.subtree"] = infalling_subhalo_dict["ID.subtree"][infall_scale_argsort_idx]
+    infalling_subhalo_dict["tree.tid"] = infalling_subhalo_dict["tree.tid"][infall_scale_argsort_idx]
     infalling_subhalo_dict["scale.infall"] = infalling_subhalo_dict["scale.infall"][infall_scale_argsort_idx]
     infalling_subhalo_dict["snapshot.infall"] = infalling_subhalo_dict["snapshot.infall"][infall_scale_argsort_idx]
     infalling_subhalo_dict["idx.infall"] = infalling_subhalo_dict["idx.infall"][infall_scale_argsort_idx]
     infalling_subhalo_dict["subtree"] = infalling_subhalo_dict["subtree"][infall_scale_argsort_idx]
     infalling_subhalo_dict["infalling?"] = infalling_subhalo_dict["infalling?"][infall_scale_argsort_idx]
+    infalling_subhalo_dict["ID.halo.infall"] = infalling_subhalo_dict["ID.halo.infall"][infall_scale_argsort_idx]
     #
     out_string = (
         f"* Number of subhalos with {low_z}<=z_infall<={high_z}"
         f" and {min_vinfall}<=V_infall<{max_vinfall}km/s:"
-        f" {len(infalling_subhalo_dict['ID.subtree'])}"
+        f" {len(infalling_subhalo_dict['tree.tid'])}"
     )
     print(out_string, flush=True, file=out_f)
     #
@@ -426,7 +448,7 @@ def find_infalling_subhalos_FIRE(BH_parameters, main_branch_df, host_halo_dict, 
     return(infalling_subhalo_dict)
 def find_infalling_subhalos(BH_parameters, subtree_main_branch_df, host_halo_dict, out_f):
     # Initialize the result dictionary.
-    infalling_subhalo_dict = {"ID.subtree":[],
+    infalling_subhalo_dict = {"tree.tid":[],
                               "scale.infall":[],
                               "idx.infall":[],
                               "subtree":[],
@@ -475,14 +497,14 @@ def find_infalling_subhalos(BH_parameters, subtree_main_branch_df, host_halo_dic
             # Check if min_vinfall<=Vinfall<max_vinfall.
             #if infall_row.vmax>=min_vinfall:
             if infall_row.vmax>=min_vinfall and infall_row.vmax<=max_vinfall:
-                infalling_subhalo_dict["ID.subtree"].append(current_sid)
+                infalling_subhalo_dict["tree.tid"].append(current_sid)
                 infalling_subhalo_dict["scale.infall"].append(infall_a)
                 infalling_subhalo_dict["idx.infall"].append(infall_idx)
                 infalling_subhalo_dict["subtree"].append(current_subtree)
                 infalling_subhalo_dict["infalling?"].append(infalling)
     #
     # Convert lists to arrays.
-    infalling_subhalo_dict["ID.subtree"] = np.array(infalling_subhalo_dict["ID.subtree"])
+    infalling_subhalo_dict["tree.tid"] = np.array(infalling_subhalo_dict["tree.tid"])
     infalling_subhalo_dict["scale.infall"] = np.array(infalling_subhalo_dict["scale.infall"])
     infalling_subhalo_dict["idx.infall"] = np.array(infalling_subhalo_dict["idx.infall"])
     infalling_subhalo_dict["subtree"] = np.array(infalling_subhalo_dict["subtree"], dtype=object)
@@ -490,7 +512,7 @@ def find_infalling_subhalos(BH_parameters, subtree_main_branch_df, host_halo_dic
     #
     # Sort the infalling subhalo dictionary data by the infall scale factor.
     infall_scale_argsort_idx = np.argsort(infalling_subhalo_dict["scale.infall"])
-    infalling_subhalo_dict["ID.subtree"] = infalling_subhalo_dict["ID.subtree"][infall_scale_argsort_idx]
+    infalling_subhalo_dict["tree.tid"] = infalling_subhalo_dict["tree.tid"][infall_scale_argsort_idx]
     infalling_subhalo_dict["scale.infall"] = infalling_subhalo_dict["scale.infall"][infall_scale_argsort_idx]
     infalling_subhalo_dict["idx.infall"] = infalling_subhalo_dict["idx.infall"][infall_scale_argsort_idx]
     infalling_subhalo_dict["subtree"] = infalling_subhalo_dict["subtree"][infall_scale_argsort_idx]
@@ -499,7 +521,7 @@ def find_infalling_subhalos(BH_parameters, subtree_main_branch_df, host_halo_dic
     out_string = (
         f"* Number of subhalos with {low_z}<=z_infall<={high_z}"
         f" and {min_vinfall}<=V_infall<{max_vinfall}km/s:"
-        f" {len(infalling_subhalo_dict['ID.subtree'])}"
+        f" {len(infalling_subhalo_dict['tree.tid'])}"
     )
     print(out_string, flush=True, file=out_f)
     #
@@ -585,7 +607,7 @@ def connect_rockstar_sets(sim_num, BH_parameters, snapnum_info_dict, infalling_s
         end_idx = start_idx + num_subs
         #
         # Get the infalling subhalo data for the current scale factor.
-        current_scale_sids = infalling_subhalo_dict['ID.subtree'][start_idx:end_idx]
+        current_scale_sids = infalling_subhalo_dict['tree.tid'][start_idx:end_idx]
         current_scale_infall_idxs = infalling_subhalo_dict['idx.infall'][start_idx:end_idx]
         current_scale_infall_scales = infalling_subhalo_dict['scale.infall'][start_idx:end_idx]
         current_scale_infall_subtrees = infalling_subhalo_dict['subtree'][start_idx:end_idx]
@@ -653,7 +675,7 @@ def summary_statement_FIRE(infalling_subhalo_dict, out_f):
     infalling_subs_idx = np.where(infalling_subhalo_dict["infalling?"] == 1)[0]
     broken_link_subs_idx = np.where(infalling_subhalo_dict["infalling?"] == 0)[0]
     #
-    num_all_infall_subs = len(infalling_subhalo_dict['ID.subtree'])
+    num_all_infall_subs = len(infalling_subhalo_dict['tree.tid'])
     num_real_infall_subs = len(infalling_subs_idx)
     num_broken_link_subs = len(broken_link_subs_idx)
     #
@@ -670,7 +692,7 @@ def summary_statement(infalling_subhalo_dict, out_f):
     infalling_subs_idx = np.where(infalling_subhalo_dict["infalling?"] == 1)[0]
     broken_link_subs_idx = np.where(infalling_subhalo_dict["infalling?"] == 0)[0]
     #
-    num_all_infall_subs = len(infalling_subhalo_dict['ID.subtree'])
+    num_all_infall_subs = len(infalling_subhalo_dict['tree.tid'])
     num_all_infall_with_match = len(np.where(infalling_subhalo_dict["ID.halo.infall"] != -1)[0])
     num_all_infall_without_match = len(np.where(infalling_subhalo_dict["ID.halo.infall"] == -1)[0])
     num_broken_link_subs = len(broken_link_subs_idx)
@@ -744,6 +766,7 @@ def save_infall_subtree_result_FIRE(infalling_subhalo_dict, BH_parameters, sim_n
     subtree_arr = infalling_subhalo_dict["subtree"]
     infall_scale_factor_arr = infalling_subhalo_dict["scale.infall"]
     infall_snapnum_arr = infalling_subhalo_dict["snapshot.infall"]
+    catalog_hID_arr = infalling_subhalo_dict["ID.halo.infall"]
     infall_check_arr = infalling_subhalo_dict["infalling?"]
     #
     # Add infall scale factor, infall snapshot number, and matched halo ID columns to each subtree.
@@ -752,6 +775,7 @@ def save_infall_subtree_result_FIRE(infalling_subhalo_dict, BH_parameters, sim_n
         current_tree_infall_scale = infall_scale_factor_arr[i]
         current_tree_infall_snapnum = infall_snapnum_arr[i]
         current_tree_infall_check = infall_check_arr[i]
+        current_tree_catalog_hID = catalog_hID_arr[i]
         #
         # Number of dataframe rows for the current subtree.
         df_length = len(current_tree)
@@ -760,11 +784,13 @@ def save_infall_subtree_result_FIRE(infalling_subhalo_dict, BH_parameters, sim_n
         current_tree_infall_scale_arr = np.full(df_length, current_tree_infall_scale)
         current_tree_infall_snapnum_arr = np.full(df_length, current_tree_infall_snapnum)
         current_tree_infall_check_arr = np.full(df_length, current_tree_infall_check)
+        current_tree_catalog_hID_arr = np.full(df_length, current_tree_catalog_hID)
         #
         # Append the infall scale factor, infall snapshot number, matched halo ID, and infall check arrays as dataframe columns.
         current_tree['scale.infall'] = current_tree_infall_scale_arr
         current_tree['snapshot.infall'] = current_tree_infall_snapnum_arr
         current_tree['infalling?'] = current_tree_infall_check_arr
+        current_tree['ID.halo.infall'] = current_tree_catalog_hID_arr
     #
     # Combine the array of dataframes as one big dataframe of subtrees.
     combined_subtree_df = pd.concat(subtree_arr)
@@ -792,8 +818,10 @@ def infall_criteria_sub_wrapper_function_FIRE(base_dir, sim_num, simnums, BH_par
     #
     # Make file names for processed (sub)halo data files.
     processed_dat_fnames = various_halo_file_names_FIRE(base_dir, sim_num)
-    # 
-    print("### Reading in data ###", flush=True, file=out_f)
+    #
+    print(f"### Identifying infalling subhalos from the disrupted population ###", flush=True, file=out_f)
+    print("", flush=True, file=out_f)
+    print("# Reading in data #", flush=True, file=out_f)
     # Read in the host halo main branch file.
     t_s_step = time.time()
     host_halo_dict = read_in_host_main_branch_file_FIRE(processed_dat_fnames, sim_num, BH_parameters)
@@ -802,48 +830,53 @@ def infall_criteria_sub_wrapper_function_FIRE(base_dir, sim_num, simnums, BH_par
     # Read in the subtree main branch file: main branch tree file for all subhalos of the host halo.
     subtree_main_branch_df = read_in_tree_main_branch_file_FIRE(processed_dat_fnames, 'subtree')
     print(f"* Subtree main branch data for all subhalos of the host halo read in.", flush=True, file=out_f)
-    # Read in the (surviving) tree main branch file: main branch tree file for ALL halos in consistent-trees
-    tree_main_branch_df = read_in_tree_main_branch_file_FIRE(processed_dat_fnames, 'tree')
-    print(f"* Tree main branch data for all halos read in.", flush=True, file=out_f)
     t_e_step = time.time()
-    utilities.print_time_taken(t_s_step, t_e_step, "###", True, out_f)
-    print("", flush=True, file=out_f)
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
     #
     # Find infalling subhalos.
+    print("# Identifying infalling subhalos #", flush=True, file=out_f)
     t_s_step = time.time()
-    print(f"### Identifying infalling subhalos from the disrupted population ###", flush=True, file=out_f)
     infalling_subhalo_from_subtree_dict = find_infalling_subhalos_FIRE(BH_parameters, subtree_main_branch_df, host_halo_dict, out_f)
     t_e_step = time.time()
-    utilities.print_time_taken(t_s_step, t_e_step, "###", True, out_f)
-    print("", flush=True, file=out_f)
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
     #
     # Print infalling subhalo identification summary statements.
     summary_statement_FIRE(infalling_subhalo_from_subtree_dict, out_f)
     #
     # Save the result subtrees.
+    print("# Saving the infalling subhalo tree result #", flush=True, file=out_f)
     t_s_step = time.time()
-    print("### Saving the infalling subhalo subtree result ###", flush=True, file=out_f)
     save_infall_subtree_result_FIRE(infalling_subhalo_from_subtree_dict, BH_parameters, sim_num, 'subtree', out_f)
     t_e_step = time.time()
-    utilities.print_time_taken(t_s_step, t_e_step, "###", True, out_f)
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
     print("", flush=True, file=out_f)
     #
-    t_s_step = time.time()
     print(f"### Identifying infalling subhalos from the surviving population ###", flush=True, file=out_f)
+    print("", flush=True, file=out_f)
+    print("# Reading in data #", flush=True, file=out_f)
+    # Read in the (surviving) tree main branch file: main branch tree file for ALL halos in consistent-trees
+    t_s_step = time.time()
+    tree_main_branch_df = read_in_tree_main_branch_file_FIRE(processed_dat_fnames, 'tree')
+    print(f"* Tree main branch data for all halos read in.", flush=True, file=out_f)
+    t_e_step = time.time()
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
+    #
+    # Find infalling subhalos.
+    print("# Identifying infalling subhalos #", flush=True, file=out_f)
+    t_s_step = time.time()
     infalling_subhalo_from_tree_dict = find_infalling_subhalos_FIRE(BH_parameters, tree_main_branch_df, host_halo_dict, out_f)
     t_e_step = time.time()
-    utilities.print_time_taken(t_s_step, t_e_step, "###", True, out_f)
-    print("", flush=True, file=out_f)
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
     #
     # Print infalling subhalo identification summary statements.
     summary_statement_FIRE(infalling_subhalo_from_tree_dict, out_f)
     #
     # Save the result trees.
     t_s_step = time.time()
-    print("### Saving the infalling subhalo tree result ###", flush=True, file=out_f)
-    save_infall_subtree_result_FIRE(infalling_subhalo_from_subtree_dict, BH_parameters, sim_num, 'tree', out_f)
+    print("# Saving the infalling subhalo tree result #", flush=True, file=out_f)
+    save_infall_subtree_result_FIRE(infalling_subhalo_from_tree_dict, BH_parameters, sim_num, 'tree', out_f)
     t_e_step = time.time()
-    utilities.print_time_taken(t_s_step, t_e_step, "###", True, out_f)
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
     print("", flush=True, file=out_f)
 #
 #

@@ -38,13 +38,16 @@ subhalo_selection_done = 0 # 0: false, 1: true
 #
 # Whether halo particle tracking for identified infalling subhalos have already been done or not.
 # If it's already been done, move on to the subhalo analysis step.
-halo_particle_tracking_done = 0 # 0: false, 1:true
+halo_particle_tracking_done = 1 # 0: false, 1:true
 #
 # Simulation numbers/names
 #sim_nums = [493, 539, 609, 694, 833, 848, 879, 988, 1107, 1245, 1386]
 #sim_nums = [493]
 sim_nums = [m12c_r7100]
 last_snapnum = 600
+#
+# Number of rockstar files per snapshot.
+num_rockstar_files = 16
 #
 # Whether the same halos need to be tracked in multiple simulations.
 # Example: Phat ELVIS has Disk simulations that are identical to their DMO counterparts.
@@ -81,7 +84,7 @@ max_vinfall = 70.
 # the initial set needs to be matched to the data from the new set.
 #
 # Whether there are two sets of Rockstar results. This should be 0 in most cases!
-two_rockstars = 1 # 0: false, 1: true
+two_rockstars = 0 # 0: false, 1: true
 #
 # COM (pMpc) and Vmax (relative difference) range to use for matching halos.
 com_range = 0.001

@@ -99,12 +99,12 @@ def BH_initialization(parameter_fname, header_statement):
 '''
 * This function
 '''
-def read_in_infalling_subtree_data_FIRE(BH_parameters, sim_num, out_f):
+def read_in_infalling_subtree_data_FIRE(BH_parameters, sim_num, tree_type, out_f):
     #
     # File name for the infall criteria subtree file.
     fdir = BH_parameters['infall_subtree_out_dir']
     fname_base = BH_parameters['infall_subtree_out_fname_base']
-    fname = f"{fdir}/{sim_num}_{sim_type}_{fname_base}.hdf5"
+    fname = f"{fdir}/{sim_num}_{tree_type}_{fname_base}.hdf5"
     #
     # Read in the data.
     infall_subtree_df = pd.read_hdf(fname)
@@ -124,6 +124,15 @@ def read_in_infalling_subtree_data(BH_parameters, sim_num, out_f):
 '''
 
 '''
+def remove_incomplete_subtrees_FIRE(infall_subtree_df, BH_parameters, out_f):
+    print(f"* 1) Number of subhalos in the infalling subtree file: {len(infall_subtree_df.groupby('tree.tid'))}", file=out_f)
+    # Take only infalling subhalos: infalling? = 1.
+    infalling_query = infall_subtree_df.query("`infalling?` == 1")
+    print(f"* 2) Number of actually infalling subhalos in 1) (infalling? = 1): {len(infalling_query.groupby('tree.tid'))}", flush=True, file=out_f)
+    #
+    print("", flush=True, file=out_f)
+    return(infalling_query)
+#
 def remove_incomplete_subtrees(infall_subtree_df, BH_parameters, out_f):
     print(f"* 1) Number of subhalos in the infalling subtree file: {len(infall_subtree_df.groupby('subtree_id'))}", file=out_f)
     if BH_parameters["two_rockstars"] == 1:
@@ -162,7 +171,7 @@ def get_infall_information(infall_subtree_df):
         current_subtrees = infall_subtree_df.query("`snapshot.infall`== @current_snapnum")
         #
         # Get subtree_id and ID.halo.infall values corresponding to the current scale.infall value.
-        sid_list.append(current_subtrees['subtree_id'].unique())
+        sid_list.append(current_subtrees['tree.tid'].unique())
         hid_list.append(current_subtrees['ID.halo.infall'].unique())
     #
     infall_information_dict["ID.subtree"] = sid_list
@@ -269,8 +278,14 @@ def get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out
     # Particle IDs for each halo will be appended to a list in infall_information_dict.
     infall_information_dict['ID.particle'] = []
     #
+    # Number of rockstar output files per snapshot.
+    num_rockstar_files = BH_parameters['num_rockstar_files']
     #
-    halo_finding_output_dir = f"{BH_parameters['base_dir']}/{BH_parameters['run_type']}/halo_{sim_num}/rockstar_catalogs/rockstar_output"
+    #
+    if BH_parameters['simulation_name']=='pELVIS':
+        halo_finding_output_dir = f"{BH_parameters['base_dir']}/{BH_parameters['run_type']}/halo_{sim_num}/rockstar_catalogs/rockstar_output"
+    elif BH_parameters['simulation_name']=='FIRE':
+        halo_finding_output_dir = f"{BH_parameters['base_dir']}/halo/rockstar_dm/catalog"
     #
     #
     infall_snapshot_arr = infall_information_dict["snapshot.infall"]
@@ -281,8 +296,8 @@ def get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out
         current_snap_infall_hid_arr = infall_hid_list[i]
         #
         # Read in Rockstar halo particle data for the current snapshot.
-        catalog_ascii_fnames = utilities.make_rockstar_fnames(halo_finding_output_dir, 8, current_snap, 'ascii')
-        catalog_bin_fnames = utilities.make_rockstar_fnames(halo_finding_output_dir, 8, current_snap, 'bin')
+        catalog_ascii_fnames = utilities.make_rockstar_fnames(halo_finding_output_dir, num_rockstar_files, current_snap, 'ascii')
+        catalog_bin_fnames = utilities.make_rockstar_fnames(halo_finding_output_dir, num_rockstar_files, current_snap, 'bin')
         hID_numP_pairs_df_list = get_hIDs_and_num_ps(catalog_ascii_fnames)
         #
         print(f"* Reading in halo particle ID data for snapshot {current_snap}... ", end="", flush=True, file=out_f)
@@ -297,6 +312,7 @@ def get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out
         #
         # Get particle IDs of halos infalling at the current snapshot.
         current_snap_pID_list = []
+        print(len(current_snap_infall_hid_arr), len(particle_ID_list))
         for j in range(len(current_snap_infall_hid_arr)):
             current_hID = current_snap_infall_hid_arr[j]
             current_halo_pID_tuple = get_particle_IDs_of_halo(current_hID, hID_numP_pairs_df_list, particle_ID_list, out_f)
@@ -305,6 +321,33 @@ def get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out
         # Append the pID list for the current snapshot to the result dictionary.
         infall_information_dict['ID.particle'].append(current_snap_pID_list)
     #
+    return(infall_information_dict)
+#
+def initialize_halo_tracking_FIRE(BH_parameters, sim_num, out_f):
+    '''
+    * This function initializes subhalo tracking by retrieving the particle ID data for identified infalling subhalos.
+    '''
+    # Read in the infalling subtree data for the given simulation number.
+    print("# Reading in infalling subhalo data identified by infalling_subhalo_criteria.py #", flush=True, file=out_f)
+    infall_subtree_df = read_in_infalling_subtree_data_FIRE(BH_parameters, sim_num, 'subtree', out_f)
+    infall_tree_df = read_in_infalling_subtree_data_FIRE(BH_parameters, sim_num, 'tree', out_f)
+    # Merge the two dataframes.
+    infall_subhalo_df = pd.concat([infall_subtree_df, infall_tree_df])
+    #
+    # Remove broken-link subhalos.
+    cleaned_infall_subtree_df = remove_incomplete_subtrees_FIRE(infall_subhalo_df, BH_parameters, out_f)
+    #
+    # Get ID.subtree and ID.halo.infall arrays organized according to the infall time.
+    infall_information_dict = get_infall_information(cleaned_infall_subtree_df)
+    #
+    t_s_step = time.time()
+    print("# Getting the halo particle data for infalling subhalos #", flush=True, file=out_f)
+    infall_information_dict = get_infall_particle_IDs(infall_information_dict, BH_parameters, sim_num, out_f)
+    t_e_step = time.time()
+    utilities.print_time_taken(t_s_step, t_e_step, "#", True, out_f)
+    print("", flush=True, file=out_f)
+    #
+    # Return the infalling subhalo data dictionary.
     return(infall_information_dict)
 #
 def initialize_halo_tracking(BH_parameters, sim_num, out_f):
@@ -650,7 +693,10 @@ def main():
             # Initialize halo tracking.
             t_s_step = time.time()
             print("### Initializing halo tracking ###", flush=True, file=out_f)
-            infall_information_dict = initialize_halo_tracking(BH_parameters, sim_num, out_f)
+            if BH_parameters['simulation_name'] == 'pELVIS':
+                infall_information_dict = initialize_halo_tracking(BH_parameters, sim_num, out_f)
+            elif BH_parameters['simulation_name'] == 'FIRE':
+                infall_information_dict = initialize_halo_tracking_FIRE(BH_parameters, sim_num, out_f)
             t_e_step = time.time()
             print("### Initializing halo tracking finished! ###", flush=True, file=out_f)
             utilities.print_time_taken(t_s_step, t_e_step, "###", True, out_f)
